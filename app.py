@@ -217,7 +217,7 @@ if calcular:
         st.write(f"- Período do dia: **{label_periodo[nivel]}**")
 
         conforto = atemp_norm * (1 - hum_norm)
-        emoji_c  = "😊 Agradável" if conforto > 0.35 else "😓 Desconfortável"
+        emoji_c  = "😊 Agradável" if conforto > 0.20 else "😓 Desconfortável"
         st.write(f"- Índice de conforto: **{conforto:.2f}** — {emoji_c}")
 
         if weathersit >= 3 and workingday == 0:
