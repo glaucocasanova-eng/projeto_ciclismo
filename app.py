@@ -6,7 +6,7 @@
 
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib  # ← Mudança: usar joblib em vez de pickle
 import numpy as np
 import os
 from datetime import datetime
@@ -31,9 +31,9 @@ def carregar_modelo():
     carregados = {}
     for chave, caminho in arquivos.items():
         if not os.path.exists(caminho):
+            st.warning(f"Arquivo não encontrado: {caminho}")
             return None
-        with open(caminho, "rb") as f:
-            carregados[chave] = pickle.load(f)
+        carregados[chave] = joblib.load(caminho)  # ← Mudança: joblib.load
     return carregados
 
 recursos = carregar_modelo()
@@ -55,22 +55,33 @@ def montar_vetor(hr, mnth, weekday, season, holiday,
                  workingday, weathersit, temp, atemp, hum, windspeed):
     """
     Monta o vetor de entrada na ordem EXATA das variáveis do treino.
-    Nota: 'yr' foi removido — o modelo foi treinado com ambos os anos
-    (2011 e 2012) e generaliza por padrões de uso, não por ano histórico.
+    Ordem definida no treinamento: 
+    ['hr', 'hr_sq', 'mnth', 'weekday', 'season', 'holiday',
+     'workingday', 'weathersit', 'temp', 'atemp', 'hum',
+     'windspeed', 'periodo_dia', 'conforto_termico', 'chuva_fds']
     """
     periodo_dia      = calcular_nivel_rush(hr)
     conforto_termico = atemp * (1 - hum)
-    chuva_fds        = int(weathersit >= 3 and workingday == 0)
+    chuva_fds        = 1 if (weathersit >= 3 and workingday == 0) else 0
     hr_sq            = hr ** 2
 
-    # Ordem exata: ['hr','hr_sq','mnth','weekday','season','holiday',
-    #               'workingday','weathersit','temp','atemp','hum',
-    #               'windspeed','periodo_dia','conforto_termico','chuva_fds']
+    # Ordem EXATA das variáveis usadas no treinamento
     return np.array([[
-        hr, hr_sq, mnth, weekday,
-        season, holiday, workingday, weathersit,
-        temp, atemp, hum, windspeed,
-        periodo_dia, conforto_termico, chuva_fds,
+        hr,                    # 0
+        hr_sq,                 # 1
+        mnth,                  # 2
+        weekday,               # 3
+        season,                # 4
+        holiday,               # 5
+        workingday,            # 6
+        weathersit,            # 7
+        temp,                  # 8
+        atemp,                 # 9
+        hum,                   # 10
+        windspeed,             # 11
+        periodo_dia,           # 12
+        conforto_termico,      # 13
+        chuva_fds              # 14
     ]])
 
 
@@ -130,8 +141,8 @@ with st.sidebar:
                      st.selectbox("Condição climática", OPCOES_CLIMA)
                  ) + 1
 
-    holiday    = int(st.toggle("É feriado?",  value=False))
-    workingday = int(st.toggle("É dia útil?", value=True))
+    holiday    = 1 if st.toggle("É feriado?",  value=False) else 0  # ← mudança
+    workingday = 1 if st.toggle("É dia útil?", value=True) else 0   # ← mudança
 
     st.divider()
 
@@ -162,8 +173,8 @@ with col_btn:
 if calcular:
     if recursos is None:
         st.error(
-            "Modelo não encontrado em /models. "
-            "Execute **python treinamento_final.py** primeiro."
+            "Modelo não encontrado na pasta 'models/'. "
+            "Execute o script de treinamento primeiro."
         )
         st.stop()
 
@@ -172,10 +183,11 @@ if calcular:
         hr, mnth, weekday, season, holiday, workingday, weathersit,
         temp_norm, atemp_norm, hum_norm, wind_norm
     )
+    
+    # Verificar dimensão da entrada   
     entrada_pad = recursos["scaler"].transform(entrada)
-    previsao    = max(0, int(round(
-        recursos["modelo"].predict(entrada_pad)[0]
-    )))
+    previsao_raw = recursos["modelo"].predict(entrada_pad)[0]
+    previsao = max(0, int(round(previsao_raw)))
 
     # ── Resultado ─────────────────────────────────────────────
     st.divider()

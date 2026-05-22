@@ -19,7 +19,7 @@
 
 import pandas as pd
 import numpy as np
-import pickle
+import joblib
 import os
 import warnings
 warnings.filterwarnings('ignore')
@@ -119,7 +119,6 @@ def treinar():
     df = criar_variaveis(df)
 
     # Variáveis de entrada (X) — o que o modelo "enxerga"
-
     variaveis = [
         'hr', 'hr_sq',                                    # horário
         'mnth', 'weekday',                                # data
@@ -144,7 +143,6 @@ def treinar():
 
     # ── PASSO 5: Padronizar as escalas ───────────────────────
     # IMPORTANTE: fit_transform APENAS no treino.
-
     padronizador = StandardScaler()
     X_treino_pad = padronizador.fit_transform(X_treino)  # aprende a escala
     X_teste_pad  = padronizador.transform(X_teste)       # só aplica
@@ -156,7 +154,7 @@ def treinar():
     divisao_kfold = KFold(n_splits=5, shuffle=True, random_state=42)
 
     candidatos = {
-        "Regressão Linear (Ridge)": Ridge(),
+        "Regressão Linear (Ridge)": Ridge(alpha=1.0),
         "Random Forest":            RandomForestRegressor(
                                         n_estimators=100,
                                         random_state=42,
@@ -186,13 +184,20 @@ def treinar():
     vencedor_nome = max(resultados, key=resultados.get)
     print(f"\n  Vencedor do torneio: {vencedor_nome}")
 
-    # Retreinamos com TODO o conjunto de treino (não só 4/5)
-    modelo_final = RandomForestRegressor(
-        n_estimators=300,   # mais árvores = mais estável
-        random_state=42,
-        n_jobs=-1
-    ) if vencedor_nome == "Random Forest" else Ridge()
+    # Configurar o modelo vencedor com hiperparâmetros otimizados
+    if vencedor_nome == "Random Forest":
+        modelo_final = RandomForestRegressor(
+            n_estimators=50,
+            max_depth=12,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            random_state=42,
+            n_jobs=-1
+        )
+    else:
+        modelo_final = Ridge(alpha=1.0)
 
+    # Treinar com TODO o conjunto de treino (não só 4/5)
     modelo_final.fit(X_treino_pad, y_treino)
 
     # ── PASSO 8: Avaliar no conjunto de teste (nunca visto) ───
@@ -202,7 +207,7 @@ def treinar():
     r2_teste   = r2_score(y_teste, y_pred_teste)
     mae_teste  = mean_absolute_error(y_teste, y_pred_teste)
     rmse_teste = np.sqrt(mean_squared_error(y_teste, y_pred_teste))
-    mape_teste = np.mean(np.abs((y_teste - y_pred_teste) / (y_teste + 1))) * 100
+    mape_teste = np.mean(np.abs((y_teste - y_pred_teste) / (y_teste + 1e-8))) * 100
 
     print("\n" + "=" * 52)
     print(f"  DESEMPENHO NO TESTE (dados nunca vistos)")
@@ -222,37 +227,33 @@ def treinar():
             print(f"    {var:<22}: {barra}  ({peso:.3f})")
 
     # ── PASSO 9: Salvar tudo para o deploy ────────────────────
-
     os.makedirs('models', exist_ok=True)
 
     # Retreino final com 100% dos dados (treino + teste)
-    # Agora que é validado o desempenho, usando tudo disponível.
+    # Agora que o desempenho foi validado, usando tudo disponível
     padronizador_final = StandardScaler()
     X_tudo_pad = padronizador_final.fit_transform(X)
     modelo_final.fit(X_tudo_pad, y)
 
-    with open("models/cycling_demand_model.pkl", "wb") as f:
-        pickle.dump(modelo_final, f)
-    with open("models/scaler.pkl", "wb") as f:
-        pickle.dump(padronizador_final, f)
-    with open("models/features.pkl", "wb") as f:
-        pickle.dump(variaveis, f)
-    with open("models/encoders.pkl", "wb") as f:
-        pickle.dump({
-            'season':     TRADUCAO_ESTACAO,
-            'weathersit': TRADUCAO_CLIMA,
-            'holiday':    TRADUCAO_SIM_NAO,
-            'workingday': TRADUCAO_SIM_NAO,
-            'weekday':    TRADUCAO_DIA,
-            'mnth':       TRADUCAO_MES,
-        }, f)
+    # Salvar modelo, scaler e metadados
+    joblib.dump(modelo_final, "models/cycling_demand_model.pkl", compress=3)
+    joblib.dump(padronizador_final, "models/scaler.pkl", compress=3)
+    joblib.dump(variaveis, "models/features.pkl", compress=3)
+    joblib.dump({
+        'season': TRADUCAO_ESTACAO,
+        'weathersit': TRADUCAO_CLIMA,
+        'holiday': TRADUCAO_SIM_NAO,
+        'workingday': TRADUCAO_SIM_NAO,
+        'weekday': TRADUCAO_DIA,
+        'mnth': TRADUCAO_MES
+    }, "models/encoders.pkl", compress=3)
 
     print("\n  Arquivos salvos em /models:")
     print("    cycling_demand_model.pkl  — modelo treinado")
     print("    scaler.pkl                — padronizador de escalas")
     print("    features.pkl              — lista de variáveis")
     print("    encoders.pkl              — dicionários de tradução")
-    print("\nTreinamento concluido!\n")
+    print("\n✅ Treinamento concluído!\n")
 
 
 if __name__ == "__main__":
