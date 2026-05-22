@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 .streamlit/
+models/cycling_demand_model.pkl
