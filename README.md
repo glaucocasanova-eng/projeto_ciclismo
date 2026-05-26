@@ -178,7 +178,7 @@ que o modelo generalizou bem e não houve overfitting.
 ## Autor
 
 **Glauco Casanova**
-P�s-Graduação em IoT — IFSP
+Pos-Graduação em IoT — IFSP Catanduva
 
 ---
 
