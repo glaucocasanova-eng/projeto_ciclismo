@@ -87,18 +87,18 @@ Acesse `http://localhost:8501` no navegador.
 | Variável alvo    | `cnt` — total de aluguéis/hora  |
 | Valores nulos    | Nenhum                          |
 
-### Por que excluímos `casual` e `registered`?
+### Por que excluír `casual` e `registered`?
 
 Essas duas colunas somam matematicamente o valor de `cnt` (nosso alvo).
 Incluí-las seria trapacear: o modelo acertaria 100% no treino mas falharia
 completamente em produção. Isso se chama **data leakage**.
 
-### Por que removemos `yr` (ano)?
+### Por que remover `yr` (ano)?
 
 A coluna `yr` (0=2011, 1=2012) capturava o crescimento histórico da frota
 entre os dois anos do dataset. Em produção, o modelo já foi treinado com
 **ambos os anos juntos** — não faz sentido pedir ao operador que informe
-"em qual ano histórico estamos". Removemos `yr` para que o modelo generalize
+"em qual ano histórico estamos". Remove-se `yr` para que o modelo generalize
 por padrões reais de uso (hora, clima, dia da semana), não por tendência
 histórica que não se repetirá.
 
